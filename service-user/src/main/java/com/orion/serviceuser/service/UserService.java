@@ -119,6 +119,107 @@ public class UserService {
         return mapToUserResponse(user);
     }
 
+    // ===== ADMIN METHODS =====
+
+    public UserResponse createUserByAdmin(com.orion.serviceuser.dto.CreateUserByAdminRequest request) {
+        log.info("Admin creating new user: {}", request.getUsername());
+
+        // Check if username already exists
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new BadRequestException("Username already exists");
+        }
+
+        // Check if email already exists
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email already exists");
+        }
+
+        // Validate role
+        if (!request.getRole().equals("USER") && !request.getRole().equals("ADMIN")) {
+            throw new BadRequestException("Role must be USER or ADMIN");
+        }
+
+        // Create new user
+        User user = User.builder()
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(request.getRole())
+                .active(true)
+                .build();
+
+        User savedUser = userRepository.save(user);
+        log.info("Admin created user: {}", savedUser.getId());
+
+        return mapToUserResponse(savedUser);
+    }
+
+    public UserResponse updateUser(Long id, com.orion.serviceuser.dto.UpdateUserRequest request) {
+        log.info("Admin updating user: {}", id);
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Update email if provided and different
+        if (!user.getEmail().equals(request.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new BadRequestException("Email already exists");
+            }
+            user.setEmail(request.getEmail());
+        }
+
+        // Update password if provided
+        if (request.getNewPassword() != null && !request.getNewPassword().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        }
+
+        User updatedUser = userRepository.save(user);
+        log.info("User updated: {}", id);
+
+        return mapToUserResponse(updatedUser);
+    }
+
+    public UserResponse changeUserRole(Long id, com.orion.serviceuser.dto.ChangeRoleRequest request) {
+        log.info("Admin changing role for user: {}", id);
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Validate role
+        if (!request.getRole().equals("USER") && !request.getRole().equals("ADMIN")) {
+            throw new BadRequestException("Role must be USER or ADMIN");
+        }
+
+        user.setRole(request.getRole());
+        User updatedUser = userRepository.save(user);
+        log.info("User role changed to: {}", request.getRole());
+
+        return mapToUserResponse(updatedUser);
+    }
+
+    public void deleteUser(Long id) {
+        log.info("Admin deleting user: {}", id);
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        userRepository.delete(user);
+        log.info("User deleted: {}", id);
+    }
+
+    public UserResponse toggleUserStatus(Long id) {
+        log.info("Admin toggling user status: {}", id);
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        user.setActive(!user.getActive());
+        User updatedUser = userRepository.save(user);
+        log.info("User status changed to: {}", updatedUser.getActive());
+
+        return mapToUserResponse(updatedUser);
+    }
+
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())

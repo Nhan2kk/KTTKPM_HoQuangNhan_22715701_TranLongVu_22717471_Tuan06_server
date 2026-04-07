@@ -9,6 +9,8 @@ import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -46,5 +48,47 @@ public class JwtUtil {
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public boolean isTokenValid(String token) {
+        try {
+            Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token);
+            return true;
+        } catch (Exception ex) {
+            log.debug("Invalid JWT token: {}", ex.getMessage());
+            return false;
+        }
+    }
+
+    public String extractUsername(String token) {
+        Claims claims = getAllClaimsFromToken(token);
+        return claims.getSubject();
+    }
+
+    public String extractRole(String token) {
+        Claims claims = getAllClaimsFromToken(token);
+        return (String) claims.get("role");
+    }
+
+    public Long extractUserId(String token) {
+        Claims claims = getAllClaimsFromToken(token);
+        Number userId = (Number) claims.get("userId");
+        return userId != null ? userId.longValue() : null;
+    }
+
+    private Claims getAllClaimsFromToken(String token) {
+        try {
+            Jws<Claims> jws = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token);
+            return jws.getBody();
+        } catch (Exception ex) {
+            log.debug("Failed to extract claims from token: {}", ex.getMessage());
+            return null;
+        }
     }
 }
